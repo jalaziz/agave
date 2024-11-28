@@ -95,9 +95,10 @@ fn mmsghdr_for_packet(
         }
     };
 
-    hdr.write(mmsghdr {
-        msg_len: 0,
-        msg_hdr: msghdr {
+    let mut msg_hdr: msghdr;
+    #[cfg(not(target_env = "musl"))]
+    {
+        msg_hdr = msghdr {
             msg_name: addr as *mut _ as *mut _,
             msg_namelen,
             msg_iov: iov.as_mut_ptr(),
@@ -105,7 +106,24 @@ fn mmsghdr_for_packet(
             msg_control: ptr::null::<libc::c_void>() as *mut _,
             msg_controllen: 0,
             msg_flags: 0,
-        },
+        };
+    }
+
+    #[cfg(target_env = "musl")]
+    {
+        msg_hdr = unsafe { std::mem::zeroed() };
+        msg_hdr.msg_name = addr as *mut _ as *mut _;
+        msg_hdr.msg_namelen = msg_namelen;
+        msg_hdr.msg_iov = iov.as_mut_ptr();
+        msg_hdr.msg_iovlen = 1;
+        msg_hdr.msg_control = ptr::null::<libc::c_void>() as *mut _;
+        msg_hdr.msg_controllen = 0;
+        msg_hdr.msg_flags = 0;
+    }
+
+    hdr.write(mmsghdr {
+        msg_len: 0,
+        msg_hdr: msg_hdr,
     });
 }
 
